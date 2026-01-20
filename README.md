@@ -8,7 +8,7 @@ A high-performance, real-time rendering engine simulating a classroom environmen
 This project was developed to demonstrate proficiency in low-level graphics programming, rendering pipeline architecture, and the application of linear algebra in 3D simulations.
 
 ## 📸 Demo
-*(Placeholder: Drag and drop a screenshot or GIF of your running project here)*
+*(will be updated soon)*
 
 ---
 
@@ -133,7 +133,7 @@ The simulation uses standard First-Person controls.
 
 * **Framework:** Base loader utilities adapted from [opengl-tutorial.org](http://www.opengl-tutorial.org/).
 * **Assets:** Classroom models sourced from educational 3D repositories.
-* **Author:** Moksham (Year 3 Computer Graphics Project).
+* **Author:** Moksham.
 
 ---
 
