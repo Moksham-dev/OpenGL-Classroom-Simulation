@@ -1,0 +1,119 @@
+#version 330 core
+
+// Input vertex data, different for all executions of this shader.
+layout(location = 0) in vec3 vertexPosition_modelspace;
+layout(location = 1) in vec2 vertexUV;
+layout(location = 2) in vec3 vertexNormal_modelspace;
+layout(location = 3) in vec3 vertexTangent_modelspace;
+layout(location = 4) in vec3 vertexBitangent_modelspace;
+
+// Output data ; will be interpolated for each fragment.
+out vec2 UV;
+out vec3 Position_worldspace;
+out vec3 Normal_cameraspace;
+out vec3 EyeDirection_cameraspace;
+out vec3 LightDirection_cameraspace;
+out vec4 ShadowCoord;
+out vec3 Position_cameraspace;
+out vec3 Tangent_cameraspace;
+out vec3 Bitangent_cameraspace;
+out vec3 GouraudColor;
+
+// Values that stay constant for the whole mesh.
+
+uniform mat4 MVP;
+uniform mat4 V;
+uniform mat4 M;
+uniform vec3 LightInvDirection_worldspace;
+uniform mat4 DepthBiasMVP;
+uniform int uShadingModel;
+uniform vec3 ClassroomLightPositions_cameraspace[9];
+uniform mat4 DepthBiasMVPs[9];
+uniform sampler2DArrayShadow shadowMapArray;
+uniform bool bUseSpecularMap;
+
+
+void main(){
+
+	// Output position of the vertex, in clip space : MVP * position
+	gl_Position =  MVP * vec4(vertexPosition_modelspace,1);
+	
+	ShadowCoord = DepthBiasMVP * vec4(vertexPosition_modelspace,1);
+	
+	// Position of the vertex, in worldspace : M * position
+	Position_worldspace = (M * vec4(vertexPosition_modelspace,1)).xyz;
+	vec3 vertexPosition_cameraspace = ( V * M * vec4(vertexPosition_modelspace,1)).xyz; 
+    
+	
+	// Vector that goes from the vertex to the camera, in camera space.
+	// In camera space, the camera is at the origin (0,0,0).
+	EyeDirection_cameraspace = vec3(0,0,0) - ( V * M * vec4(vertexPosition_modelspace,1)).xyz;
+	Position_cameraspace = vertexPosition_cameraspace;
+
+	// Vector that goes from the vertex to the light, in camera space
+	LightDirection_cameraspace = (V*vec4(LightInvDirection_worldspace,0)).xyz;
+	
+	// Normal of the the vertex, in camera space
+	Normal_cameraspace = ( V * M * vec4(vertexNormal_modelspace,0)).xyz;
+	Tangent_cameraspace   = ( V * M * vec4(vertexTangent_modelspace,0)).xyz;
+	Bitangent_cameraspace = ( V * M * vec4(vertexBitangent_modelspace,0)).xyz; 
+	
+	// UV of the vertex. No special space for this one.
+	UV = vertexUV;
+	if (uShadingModel == 1) {
+		vec3 LED_LightColor = vec3(1.0, 1.0, 1.0); 
+		
+		vec3 n = normalize(Normal_cameraspace);
+		vec3 E = normalize(EyeDirection_cameraspace);
+		
+		// Default values (Matches Phong "else" block)
+		float factor = 1.1;
+		float linear = 0.01;
+		float quadratic = 0.005;
+		float base = 1.0;
+		float LED_LightPower = 1.25;
+		float currentShininess = 50.0;
+		vec3 ambientIntensity = vec3(0.55, 0.55, 0.55); // Default Phong Ambient
+
+		// Specular Map logic (Matches Phong "if (bUseSpecularMap)" block)
+		if (bUseSpecularMap) {
+		    factor = 0.04;
+		    linear = 0.007;
+		    quadratic = 0.0007;
+		    LED_LightPower = 10.0;
+		    base = 5.0;
+		    ambientIntensity = vec3(0.6, 0.6, 0.6); // Phong changes ambient to 0.6 here
+		}
+
+		// Initialize with correct Ambient
+		vec3 finalGouraud = ambientIntensity;
+
+		// Loop 9 lights
+		for (int i = 0; i < 9; i++) {
+		    vec3 lightToVertex = ClassroomLightPositions_cameraspace[i] - vertexPosition_cameraspace;
+		    float distance = length(lightToVertex);
+		    vec3 l = normalize(lightToVertex);
+		    vec3 R = reflect(-l, n);
+
+		    float cosTheta = clamp(dot(n, l), 0.0, 1.0);
+		    float cosAlpha = clamp(dot(E, R), 0.0, 1.0);
+
+		    float attenuation = factor / (base + linear * distance + quadratic * distance * distance);
+
+		    float shadow = 0.0;
+		    float bias = 0.005;
+		    vec4 sCoord = DepthBiasMVPs[i] * vec4(Position_worldspace, 1.0);
+		    
+		    // Sample shadow map
+		    shadow = texture(shadowMapArray, vec4(sCoord.xy/sCoord.w, float(i), (sCoord.z/sCoord.w) - bias));
+
+		    // Accumulate
+		    finalGouraud += shadow * attenuation * LED_LightColor * (LED_LightPower * cosTheta + 
+		                    LED_LightPower * pow(cosAlpha, currentShininess)); 
+		}
+		GouraudColor = finalGouraud;
+	    } else {
+		GouraudColor = vec3(0,0,0);
+	    }
+}
+
