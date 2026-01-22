@@ -137,8 +137,3 @@ The simulation uses standard First-Person controls.
 
 ---
 
-*© 2026 Moksham. Licensed under the MIT License.*
-
-```
-
-```
